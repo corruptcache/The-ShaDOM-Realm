@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Shadow DOM Realm | Corruptcache</title>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Fira+Code:wght@400;500&family=Noto+Serif:wght@400;700&display=swap"
+    rel="stylesheet">
+
+  <style>
+    :root {
+      /* General Theme Colors */
+      --void-black: #030008;
+      --shadow-purple: #2a0845;
+      --millennium-gold: #d4af37;
+      --text-main: #e0e0e0;
+
+      /* Card Frame Colors */
+      --card-spell: #1c825a;
+      --card-trap: #b31b64;
+      --card-field: #0d5e46;
+      --card-effect: #b56e22;
+      --card-link: #153c8a;
+
+      /* Card Inner UI */
+      --card-text-bg: #e5dfcf;
+      --card-border: #444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--void-black);
+      color: var(--text-main);
+      font-family: 'Fira Code', monospace;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      perspective: 1500px;
+    }
+
+    /* --- THE PURPLE/BLUE SMOKE BACKGROUND --- */
+    .vortex-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -2;
+      overflow: hidden;
+      background-color: var(--void-black);
+    }
+
+    .smoke-layer-1,
+    .smoke-layer-2 {
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      top: -50%;
+      left: -50%;
+      mix-blend-mode: screen;
+    }
+
+    .smoke-layer-1 {
+      background-image:
+        radial-gradient(circle at 40% 40%, #5e35b1 0%, transparent 50%),
+        radial-gradient(circle at 60% 60%, #3949ab 0%, transparent 60%);
+      filter: url(#smoke-mask-1) blur(10px);
+      animation: drift 40s infinite alternate ease-in-out;
+      opacity: 0.8;
+    }
+
+    .smoke-layer-2 {
+      background-image:
+        radial-gradient(circle at 30% 70%, #311b92 0%, transparent 50%),
+        radial-gradient(circle at 70% 30%, #1a237e 0%, transparent 60%);
+      filter: url(#smoke-mask-2) blur(15px);
+      animation: drift-reverse 55s infinite alternate ease-in-out;
+      opacity: 0.9;
+    }
+
+    .vortex-mask {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at 50% 50%, transparent 10%, rgba(3, 0, 8, 0.7) 60%, var(--void-black) 100%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translate(0, 0) scale(1);
+      }
+
+      50% {
+        transform: translate(-3%, 3%) scale(1.05);
+      }
+
+      100% {
+        transform: translate(3%, -3%) scale(1.02);
+      }
+    }
+
+    @keyframes drift-reverse {
+      0% {
+        transform: translate(0, 0) scale(1.05);
+      }
+
+      50% {
+        transform: translate(3%, -3%) scale(1);
+      }
+
+      100% {
+        transform: translate(-3%, 3%) scale(1.1);
+      }
+    }
+
+    header {
+      text-align: center;
+      padding: 4rem 1rem 2rem 1rem;
+      width: 100%;
+      max-width: 800px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+      z-index: 10;
+    }
+
+    h1 {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(2rem, 5vw, 4rem);
+      color: var(--millennium-gold);
+      text-shadow: 0 0 15px rgba(212, 175, 55, 0.4), 2px 2px 0px #000;
+      margin: 0 0 0.5rem 0;
+      letter-spacing: 2px;
+    }
+
+    .subtitle {
+      font-size: 1.2rem;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    .intro-text {
+      color: #d0c8b0;
+      font-size: 0.95rem;
+      max-width: 600px;
+      margin: 1.5rem auto 0 auto;
+      line-height: 1.6;
+      text-shadow: 1px 1px 3px #000;
+      font-family: 'Noto Serif', serif;
+    }
+
+    .curator {
+      margin-top: 1.5rem;
+      color: #aaa;
+      font-size: 0.95rem;
+      border-top: 1px solid rgba(212, 175, 55, 0.3);
+      padding-top: 1rem;
+      display: inline-block;
+    }
+
+    .curator-link {
+      color: var(--millennium-gold);
+      text-decoration: none;
+      transition: text-shadow 0.2s, color 0.2s;
+      font-weight: 500;
+    }
+
+    .curator-link:hover {
+      color: #fff;
+      text-shadow: 0 0 10px var(--millennium-gold);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1400px;
+      padding: 2rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .challenge-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2.5rem;
+    }
+
+    .card-link {
+      text-decoration: none;
+      color: inherit;
+      /* Create 3D space for the card to tilt within */
+      perspective: 800px;
+      display: block;
+    }
+
+    .ygo-card {
+      width: 280px;
+      height: 405px;
+      background-color: var(--card-border);
+      border: 2px solid #222;
+      border-radius: 5px;
+      padding: 8px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      /* 3D Transform settings */
+      transform-style: preserve-3d;
+      transform: translateZ(0);
+      transition: transform 0.1s, box-shadow 0.1s;
+      /* Fast transition for smooth mouse follow */
+      will-change: transform;
+      position: relative;
+    }
+
+    /* The glare effect layer over the whole card */
+    .card-glare {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 5px;
+      background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.4) 0%, transparent 60%);
+      opacity: 0;
+      pointer-events: none;
+      /* Let mouse events pass through to the card */
+      transition: opacity 0.3s;
+      z-index: 20;
+      mix-blend-mode: overlay;
+    }
+
+    .card-link:hover .card-glare {
+      opacity: 1;
+    }
+
+    /* Pop-out effect on hover */
+    .card-link:hover .ygo-card {
+      box-shadow: 0 25px 50px rgba(212, 175, 55, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+      z-index: 10;
+    }
+
+    /* Reset transform when mouse leaves */
+    .card-link.resetting .ygo-card {
+      transition: transform 0.5s ease-out, box-shadow 0.5s ease-out;
+      transform: rotateX(0deg) rotateY(0deg) translateZ(0) !important;
+    }
+
+    .card-inner {
+      border: 1px solid #111;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 4px;
+      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+      /* Push inner content slightly forward in 3D space */
+      transform: translateZ(20px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 2px solid #b8a679;
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.2));
+      padding: 4px 6px;
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+    }
+
+    .card-title {
+      font-family: 'Cinzel', serif;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #fff;
+      text-shadow: 1px 1px 2px #000;
+      margin: 0;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: 5px;
+    }
+
+    .attribute-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #fff, var(--millennium-gold) 60%);
+      border: 1px solid #000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.7rem;
+      color: #000;
+      font-weight: bold;
+      font-family: sans-serif;
+      flex-shrink: 0;
+    }
+
+    .card-art-box {
+      margin: 6px 0;
+      height: 160px;
+      border: 4px solid #666;
+      /* Reduced margin and height to give text more room */
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8), 0 2px 5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* Push art further forward */
+      transform: translateZ(30px);
+      flex-shrink: 0;
+      /* Prevent art box from shrinking */
+    }
+
+    .art-spell {
+      background: repeating-radial-gradient(circle at center, #113828, #1c523e 10%, #0a2419 20%);
+    }
+
+    .art-trap {
+      background: conic-gradient(from 0deg at 50% 50%, #4a102d, #8a1f54, #2d0a1b, #4a102d);
+    }
+
+    .art-field {
+      background: linear-gradient(135deg, #0a1f18 25%, #184233 25%, #184233 50%, #0a1f18 50%, #0a1f18 75%, #184233 75%, #184233 100%);
+      background-size: 40px 40px;
+    }
+
+    .art-effect {
+      background: radial-gradient(circle at 50% 0%, #d47e24, #5c350d);
+    }
+
+    .art-link {
+      background: linear-gradient(45deg, #061536 25%, transparent 25%, transparent 75%, #061536 75%, #061536), linear-gradient(45deg, #061536 25%, transparent 25%, transparent 75%, #061536 75%, #061536);
+      background-size: 20px 20px;
+      background-position: 0 0, 10px 10px;
+      background-color: #102a63;
+    }
+
+    .card-art-box::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .card-type {
+      font-family: 'Noto Serif', serif;
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: #000;
+      text-shadow: 0.5px 0.5px 0px rgba(255, 255, 255, 0.5);
+      margin: 0 0 4px 4px;
+      text-transform: uppercase;
+    }
+
+    .card-description {
+      background-color: var(--card-text-bg);
+      border: 2px solid #8c826c;
+      border-radius: 2px;
+      flex: 1;
+      padding: 6px;
+      font-family: 'Noto Serif', serif;
+      font-size: 0.85rem;
+      line-height: 1.25;
+      color: #111;
+      box-shadow: inset 0 0 10px rgba(140, 130, 108, 0.4);
+      display: flex;
+      flex-direction: column;
+      transform: translateZ(10px);
+      /* Prevent vertical overflow from breaking the card */
+      overflow: hidden;
+      position: relative;
+      max-height: 120px;
+      /* Force a maximum height */
+    }
+
+    .card-description span {
+      /* Use Webkit Line Clamping to cleanly truncate long text */
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      /* Maximum 4 lines of text allowed */
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* Adds the "..." when text overflows */
+      margin-bottom: auto;
+      /* Push stats to the bottom */
+    }
+
+    .card-stats {
+      text-align: right;
+      font-size: 0.85rem;
+      font-family: 'Cinzel', serif;
+      font-weight: bold;
+      border-top: 1px solid #aaa;
+      padding-top: 2px;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+
+    .spell-card .card-inner {
+      background-color: var(--card-spell);
+    }
+
+    .trap-card .card-inner {
+      background-color: var(--card-trap);
+    }
+
+    .field-card .card-inner {
+      background-color: var(--card-field);
+    }
+
+    .effect-card .card-inner {
+      background-color: var(--card-effect);
+    }
+
+    .link-card .card-inner {
+      background-color: var(--card-link);
+      background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.1) 2px, rgba(0, 0, 0, 0.1) 4px);
+    }
+
+    .art-icon {
+      font-size: 4rem;
+      color: rgba(255, 255, 255, 0.8);
+      text-shadow: 0 0 15px rgba(212, 175, 55, 0.8);
+    }
+
+    .coming-soon {
+      pointer-events: none;
+      position: relative;
+    }
+
+    .coming-soon .ygo-card {
+      filter: grayscale(100%) blur(4px) brightness(0.4);
+    }
+
+    .coming-soon::after {
+      content: '- COMING SOON -';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Cinzel', serif;
+      font-size: 1.4rem;
+      color: var(--millennium-gold);
+      text-shadow: 0 2px 5px #000;
+      font-weight: 800;
+      white-space: nowrap;
+      letter-spacing: 2px;
+      z-index: 100;
+      border: 2px solid #b8a679;
+      background: linear-gradient(to right, rgba(10, 10, 15, 0.95), rgba(30, 30, 40, 0.95));
+      padding: 10px 16px;
+      border-radius: 4px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.9), inset 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+  </style>
+</head>
+
+<body>
+
+  <svg style="display: none;">
+    <defs>
+      <filter id="smoke-mask-1" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" seed="1" result="noise" />
+        <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3 0 0 0 -0.5" in="noise"
+          result="alphaMap" />
+        <feComposite in="SourceGraphic" in2="alphaMap" operator="in" />
+      </filter>
+      <filter id="smoke-mask-2" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="3" seed="5" result="noise" />
+        <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2 0 0 0 -0.2" in="noise"
+          result="alphaMap" />
+        <feComposite in="SourceGraphic" in2="alphaMap" operator="in" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="vortex-container">
+    <div class="smoke-layer-1"></div>
+    <div class="smoke-layer-2"></div>
+  </div>
+  <div class="vortex-mask"></div>
+
+  <header>
+    <h1>The Shadow DOM Realm</h1>
+    <div class="subtitle">Client-Side Vulnerability CTF</div>
+    <p class="intro-text">Welcome to an interactive learning environment focused on client-side web vulnerabilities.
+      Choose a card below to jump to a challenge, manipulate the browser's state, and uncover the hidden flag.</p>
+    <div class="curator">Curated by <a href="https://corruptcache.me" target="_blank" rel="noopener noreferrer"
+        class="curator-link">Corruptcache</a></div>
+  </header>
+
+  <div class="container">
+    <div class="challenge-grid">
+
+      <a href="./heart-of-the-cache/index.html" class="card-link">
+        <div class="ygo-card spell-card">
+          <div class="card-glare"></div>
+          <div class="card-inner">
+            <div class="card-header">
+              <h2 class="card-title">Heart of the Cache</h2>
+              <div class="attribute-icon">魔</div>
+            </div>
+            <div class="card-art-box art-spell">
+              <div class="art-icon">💾</div>
+            </div>
+            <div class="card-type">[ Magic Card ]</div>
+            <div class="card-description">
+              <span>The Gatekeeper's memory is flawless, storing secrets right beneath your nose. Inspect the local
+                environment, manipulate the stored state, and bypass the lock without knowing the password.</span>
+              <div class="card-stats">Diff / Beginner</div>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <a href="./the-millennium-token/index.html" class="card-link coming-soon">
+        <div class="ygo-card trap-card">
+          <div class="card-glare"></div>
+          <div class="card-inner">
+            <div class="card-header">
+              <h2 class="card-title">The Millennium Token</h2>
+              <div class="attribute-icon">罠</div>
+            </div>
+            <div class="card-art-box art-trap">
+              <div class="art-icon">👁️</div>
+            </div>
+            <div class="card-type">[ Trap Card ]</div>
+            <div class="card-description">
+              <span>This ancient token grants you entry as a mere mortal. Decode its payload, shatter the signature
+                seal, and forge a new destiny as an Administrator.</span>
+              <div class="card-stats">Diff / Intermediate</div>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <a href="./the-shadow-router/index.html" class="card-link coming-soon">
+        <div class="ygo-card field-card">
+          <div class="card-glare"></div>
+          <div class="card-inner">
+            <div class="card-header">
+              <h2 class="card-title">The Shadow Router</h2>
+              <div class="attribute-icon">地</div>
+            </div>
+            <div class="card-art-box art-field">
+              <div class="art-icon">🧭</div>
+            </div>
+            <div class="card-type">[ Spell Card / Field ]</div>
+            <div class="card-description">
+              <span>The map of this realm is entirely contained within the client. Dissect the underlying architecture
+                to discover unlinked, hidden pathways leading to restricted zones.</span>
+              <div class="card-stats">Diff / Intermediate</div>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <a href="./source-map-secrets/index.html" class="card-link coming-soon">
+        <div class="ygo-card effect-card">
+          <div class="card-glare"></div>
+          <div class="card-inner">
+            <div class="card-header">
+              <h2 class="card-title">Source Map Secrets</h2>
+              <div class="attribute-icon" style="background: radial-gradient(circle at 30% 30%, #fff, #d47e24 60%);">効
+              </div>
+            </div>
+            <div class="card-art-box art-effect">
+              <div class="art-icon">📜</div>
+            </div>
+            <div class="card-type">[ Debugger / Effect ]</div>
+            <div class="card-description">
+              <span><strong>Effect:</strong> The architects left behind their original blueprints. Open the Developer
+                Tools, reconstruct the minified source code, and unearth the hardcoded credentials buried within the
+                comments.</span>
+              <div class="card-stats">ATK / 1500 DEF / 1000</div>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <a href="./the-front-end-filter/index.html" class="card-link coming-soon">
+        <div class="ygo-card link-card">
+          <div class="card-glare"></div>
+          <div class="card-inner">
+            <div class="card-header">
+              <h2 class="card-title">The Front-End Filter</h2>
+              <div class="attribute-icon"
+                style="background: radial-gradient(circle at 30% 30%, #fff, #153c8a 60%); color: #fff;">光</div>
+            </div>
+            <div class="card-art-box art-link">
+              <div class="art-icon">🔗</div>
+            </div>
+            <div class="card-type">[ Network / Link / Effect ]</div>
+            <div class="card-description">
+              <span><strong>Effect:</strong> The UI only displays what it wants you to see, but the network never lies.
+                Intercept the raw JSON payloads traversing the web and find the administrative rows filtered by the
+                client.</span>
+              <div class="card-stats">LINK-2</div>
+            </div>
+          </div>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.card-link').forEach(link => {
+      const card = link.querySelector('.ygo-card');
+      const glare = link.querySelector('.card-glare');
+
+      link.addEventListener('mousemove', (e) => {
+        // Remove reset class if it was animating back
+        link.classList.remove('resetting');
+
+        // Get the bounding rectangle of the card container
+        const rect = link.getBoundingClientRect();
+
+        // Calculate mouse position relative to the center of the card
+        const x = e.clientX - rect.left; // x position within the element
+        const y = e.clientY - rect.top;  // y position within the element
+
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        // Determine rotation (max 15 degrees)
+        // If mouse is right of center (x > centerX), rotateY should be positive to tilt right edge away
+        const rotateX = ((y - centerY) / centerY) * -15;
+        const rotateY = ((x - centerX) / centerX) * 15;
+
+        // Apply 3D transform. We add scale to make it pop out.
+        card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
+
+        // Move the glare effect based on mouse position
+        // It should be opposite to the mouse position to simulate light reflection
+        const glareX = (x / rect.width) * 100;
+        const glareY = (y / rect.height) * 100;
+        glare.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.4) 0%, transparent 60%)`;
+      });
+
+      link.addEventListener('mouseleave', () => {
+        // Add a class that triggers the CSS transition back to center
+        link.classList.add('resetting');
+
+        // Reset glare
+        glare.style.background = `radial-gradient(circle at 50% 50%, rgba(255,255,255,0.4) 0%, transparent 60%)`;
+      });
+    });
+  </script>
+</body>
+
+</html>
