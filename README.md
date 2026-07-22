@@ -32,35 +32,35 @@ Open index.html in any modern web browser.
 
 1. Heart of the Cache (Magic Card) - Available
 
-Vulnerability: Unsafe Client-Side State Management
+- Vulnerability: Unsafe Client-Side State Management
 
-Objective: Traverse levels to assemble a True Name and bypass a session-based failure lock.
+- Objective: Traverse levels to assemble a True Name and bypass a session-based failure lock.
 
-Techniques: Browser Forensics, Client-Side State Analysis.
+- Techniques: Browser Forensics, Client-Side State Analysis.
 
 2. The Millennium Token (Trap Card) - Coming Soon
 
-Vulnerability: Insecure JWT / Token Forgery
+- Vulnerability: Insecure JWT / Token Forgery
 
-Objective: Decode the payload, shatter the signature seal, and forge a new destiny as an Administrator.
+- Objective: Decode the payload, shatter the signature seal, and forge a new destiny as an Administrator.
 
 3. The Shadow Router (Field Card) - Coming Soon
 
-Vulnerability: Client-Side Access Control & Hidden Routes
+- Vulnerability: Client-Side Access Control & Hidden Routes
 
-Objective: Dissect the underlying front-end routing architecture to discover unlinked, restricted pathways.
+- Objective: Dissect the underlying front-end routing architecture to discover unlinked, restricted pathways.
 
 4. Source Map Secrets (Effect Card) - Coming Soon
 
-Vulnerability: Information Disclosure via Source Maps
+- Vulnerability: Information Disclosure via Source Maps
 
-Objective: Reconstruct minified JavaScript source code using browser DevTools to unearth hardcoded credentials.
+- Objective: Reconstruct minified JavaScript source code using browser DevTools to unearth hardcoded credentials.
 
 5. The Front-End Filter (Link Card) - Coming Soon
 
-Vulnerability: Client-Side Data Filtering
+- Vulnerability: Client-Side Data Filtering
 
-Objective: Intercept raw JSON API payloads to find administrative rows that the UI is explicitly hiding.
+- Objective: Intercept raw JSON API payloads to find administrative rows that the UI is explicitly hiding.
 
 ## 💡 Why Client-Side?
 
