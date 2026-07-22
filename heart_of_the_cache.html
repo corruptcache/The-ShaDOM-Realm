@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart of the Cache | The Shadow DOM Realm</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Fira+Code:wght@400;500&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --void-black: #030008;
+            --shadow-purple: #2b0b3f;
+            --millennium-gold: #d4af37;
+            --text-main: #e0e0e0;
+            --card-monster: #c18b5e; /* Classic Normal Monster Color */
+            --star-color: #e55b13;
+        }
+
+        body {
+            background-color: var(--void-black);
+            color: var(--text-main);
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .page-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100%;
+            padding: 80px 20px 60px; /* Adds healthy whitespace around the content */
+            box-sizing: border-box;
+        }
+
+        /* --- THE PURPLE/BLUE SMOKE BACKGROUND --- */
+        .vortex-container {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -2; overflow: hidden;
+            background-color: var(--void-black);
+        }
+
+        .smoke-layer-1, .smoke-layer-2 {
+            position: absolute;
+            width: 200%; height: 200%;
+            top: -50%; left: -50%;
+            mix-blend-mode: screen;
+        }
+
+        .smoke-layer-1 {
+            background-image: 
+                radial-gradient(circle at 40% 40%, #5e35b1 0%, transparent 50%),
+                radial-gradient(circle at 60% 60%, #3949ab 0%, transparent 60%);
+            filter: url(#smoke-mask-1) blur(10px);
+            animation: drift 40s infinite alternate ease-in-out;
+            opacity: 0.8;
+        }
+
+        .smoke-layer-2 {
+            background-image: 
+                radial-gradient(circle at 30% 70%, #311b92 0%, transparent 50%),
+                radial-gradient(circle at 70% 30%, #1a237e 0%, transparent 60%);
+            filter: url(#smoke-mask-2) blur(15px);
+            animation: drift-reverse 55s infinite alternate ease-in-out;
+            opacity: 0.9;
+        }
+
+        .vortex-mask {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle at 50% 50%, transparent 10%, rgba(3,0,8,0.7) 60%, var(--void-black) 100%);
+            z-index: -1; pointer-events: none;
+        }
+
+        @keyframes drift {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-3%, 3%) scale(1.05); }
+            100% { transform: translate(3%, -3%) scale(1.02); }
+        }
+
+        @keyframes drift-reverse {
+            0% { transform: translate(0, 0) scale(1.05); }
+            50% { transform: translate(3%, -3%) scale(1); }
+            100% { transform: translate(-3%, 3%) scale(1.1); }
+        }
+
+        .objective-text {
+            color: #d0c8b0;
+            font-family: 'Noto Serif', serif;
+            font-size: 0.95rem;
+            text-align: center;
+            max-width: 450px;
+            margin-bottom: 35px; /* Increased white space below the objective */
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+            text-shadow: 1px 1px 3px #000;
+            line-height: 1.5;
+        }
+
+        .objective-text strong {
+            color: var(--millennium-gold);
+            font-family: 'Cinzel', serif;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 1rem;
+        }
+
+        .challenge-container {
+            position: relative;
+            z-index: 10;
+            perspective: 1000px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .ygo-card {
+            width: 340px;
+            height: 490px;
+            background-color: #333;
+            border: 2px solid #111;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.8), 0 0 20px rgba(212, 175, 55, 0.2);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .card-inner {
+            background-color: var(--card-monster);
+            border: 2px solid #555;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 6px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid #b8a679;
+            background: linear-gradient(to right, rgba(0,0,0,0.4), rgba(0,0,0,0.1));
+            padding: 4px 8px;
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);
+        }
+
+        .card-title {
+            font-family: 'Cinzel', serif;
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .attribute-icon {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fff, #4a102d 60%);
+            border: 1px solid #000; box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.8rem; color: #fff; font-weight: bold;
+        }
+
+        .level-stars {
+            display: flex;
+            justify-content: flex-end;
+            padding: 5px 0;
+            gap: 2px;
+            height: 30px;
+        }
+
+        .star {
+            width: 22px; height: 22px;
+            background: radial-gradient(circle at center, #ffd700, var(--star-color));
+            border-radius: 50%; border: 1px solid #555;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.8), inset -2px -2px 4px rgba(0,0,0,0.4);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .star::after {
+            content: '★'; color: rgba(255,255,255,0.7); font-size: 14px; text-shadow: 1px 1px 1px #000;
+        }
+
+        .card-art-box {
+            margin: 4px 0; height: 180px; border: 4px solid #444;
+            background: radial-gradient(circle at center, #222, #000);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.9), 0 2px 5px rgba(0,0,0,0.5);
+            position: relative; display: flex; justify-content: center; align-items: center;
+            overflow: hidden;
+        }
+        
+        .art-silhouette {
+            font-size: 6rem; filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.5));
+            opacity: 0.8;
+        }
+
+        .card-description-box {
+            background-color: #e5dfcf; border: 2px solid #8c826c; border-radius: 2px;
+            flex: 1; padding: 10px; font-family: 'Noto Serif', serif; font-size: 0.95rem;
+            color: #111; box-shadow: inset 0 0 10px rgba(140, 130, 108, 0.4);
+            display: flex; flex-direction: column;
+        }
+
+        .card-type { 
+            font-weight: normal; 
+            font-style: italic; 
+            margin-bottom: 5px; 
+            font-size: 0.75rem; 
+            color: #555; 
+        }
+        
+        #story-text { margin-bottom: auto; line-height: 1.4; }
+        .highlight { color: #8a1f54; font-weight: bold; }
+
+        .console-area {
+            margin-top: 25px;
+            width: 340px;
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px;
+        }
+
+        .console-area input[type="text"] {
+            width: 100%; padding: 10px; font-family: 'Fira Code', monospace;
+            background: rgba(10, 10, 15, 0.9); border: 2px solid #555; 
+            border-radius: 4px; color: #fff; font-size: 0.95rem;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .console-area input[type="text"]:focus {
+            outline: none;
+            border-color: var(--millennium-gold);
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+
+        .console-area button {
+            background: linear-gradient(to bottom, #4a102d, #2d0a1b);
+            color: var(--millennium-gold); padding: 12px;
+            font-family: 'Cinzel', serif; font-weight: 800; font-size: 1.1rem; 
+            cursor: pointer; border-radius: 4px; text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8), inset 0 0 5px rgba(255,255,255,0.1);
+            transition: all 0.2s;
+            border: 1px solid #8a1f54;
+        }
+        
+        .console-area button:hover { 
+            background: linear-gradient(to bottom, #6a1a42, #4a102d); 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8), 0 0 15px rgba(212, 175, 55, 0.4);
+            border-color: var(--millennium-gold);
+        }
+
+        #hint-box {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px;
+            border-left: 4px solid #ff3333;
+            background: rgba(40, 10, 10, 0.95);
+            color: #ffaaaa;
+            font-size: 0.85rem;
+            width: 320px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 10px rgba(255, 51, 51, 0.2);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 15px;
+            transform: translateX(120%);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+        }
+
+        #hint-box.show {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .close-toast {
+            cursor: pointer;
+            color: #fff;
+            font-size: 1.2rem;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .close-toast:hover {
+            opacity: 1;
+        }
+
+        .back-link {
+            position: absolute; top: 20px; left: 20px; color: var(--millennium-gold);
+            text-decoration: none; font-size: 0.9rem; z-index: 100;
+        }
+        .back-link:hover { text-decoration: underline; }
+
+    </style>
+</head>
+<body>
+
+    <a href="./index.html" class="back-link">← Return to the Realm</a>
+    
+    <svg style="display: none;">
+        <defs>
+            <filter id="smoke-mask-1" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" seed="1" result="noise" />
+                <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3 0 0 0 -0.5" in="noise" result="alphaMap" />
+                <feComposite in="SourceGraphic" in2="alphaMap" operator="in" />
+            </filter>
+            <filter id="smoke-mask-2" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="3" seed="5" result="noise" />
+                <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2 0 0 0 -0.2" in="noise" result="alphaMap" />
+                <feComposite in="SourceGraphic" in2="alphaMap" operator="in" />
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="vortex-container"><div class="smoke-layer-1"></div><div class="smoke-layer-2"></div></div>
+    <div class="vortex-mask"></div>
+
+    <div class="page-wrapper">
+        <div class="challenge-container">
+            <div class="objective-text">
+                <strong>Objective:</strong> Figure out how to traverse the star levels, reconstruct the True Name, and submit it at star level 8.
+            </div>
+
+            <div class="ygo-card">
+                <div class="card-header">
+                    <h2 class="card-title" id="card-name">Cache Behemoth</h2>
+                    <div class="attribute-icon">闇</div>
+                </div>
+                
+                <div class="level-stars" id="star-container">
+                    <!-- Stars injected via JS -->
+                </div>
+
+                <div class="card-art-box">
+                    <div class="art-silhouette" id="beast-icon">🐉</div>
+                </div>
+
+                <div class="card-description-box">
+                    <div class="card-type">[ Beast / State / Effect ]</div>
+                    <div id="story-text">Loading state...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="console-area">
+            <!-- DEBUG LOG: Initial ascension phrase is "shadow_step". Remove before pushing to production! -->
+            <input type="text" id="password-input" placeholder="Enter Star Phrase..." autocomplete="off">
+            <button id="submit-btn">Change Star Level</button>
+        </div>
+            <div id="hint-box"></div>
+        </div>
+    </div>
+
+    <script>
+        const FLAG_PARTS = [atob('VEgzX00xTkRf'), atob('TTRLM1NfVEgzXw=='), atob('UjNBTDFUWQ==')];
+        const FULL_NAME = FLAG_PARTS.join('');
+
+        if (!localStorage.getItem('star_level')) {
+            localStorage.setItem('star_level', '4');
+        }
+        if (!localStorage.getItem('start_time')) {
+            localStorage.setItem('start_time', Date.now().toString());
+        }
+        if (!sessionStorage.getItem('failed_attempts')) {
+            sessionStorage.setItem('failed_attempts', '0');
+        }
+
+        const storyText = document.getElementById('story-text');
+        const starContainer = document.getElementById('star-container');
+        const beastIcon = document.getElementById('beast-icon');
+        const cardName = document.getElementById('card-name');
+        const passInput = document.getElementById('password-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const hintBox = document.getElementById('hint-box');
+
+        function renderState() {
+            let currentLevel = parseInt(localStorage.getItem('star_level'));
+            
+            if (isNaN(currentLevel) || currentLevel < 1) { currentLevel = 1; localStorage.setItem('star_level', '1'); }
+            if (currentLevel > 8) { currentLevel = 8; localStorage.setItem('star_level', '8'); }
+
+            starContainer.innerHTML = '';
+            for(let i = 0; i < currentLevel; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                starContainer.appendChild(star);
+            }
+
+            submitBtn.innerText = currentLevel === 8 ? "Bind Beast" : "Change Star Level";
+            passInput.placeholder = currentLevel === 8 ? "Enter the True Name..." : "Enter Star Phrase...";
+
+            switch(currentLevel) {
+                case 1:
+                    cardName.innerText = 'Optical Disc Spook';
+                    beastIcon.innerText = '💿';
+                    storyText.innerHTML = "The disc spins up an empty volume. The cache is empty here. Seek higher ground.";
+                    break;
+                case 2:
+                    cardName.innerText = 'Floppy Disk Sprite';
+                    beastIcon.innerText = '💾';
+                    storyText.innerHTML = `The disk whirs, revealing the first fragment of the True Name:<br><br><span class='highlight'>[ ${FLAG_PARTS[0]} ]</span><br><br>The rest lies beyond the midpoint.`;
+                    break;
+                case 3:
+                    cardName.innerText = 'Volatile Memo';
+                    beastIcon.innerText = '📝';
+                    storyText.innerHTML = "The memo flashes in RAM and quickly fades. Nothing of value is stored in this state.";
+                    break;
+                case 4:
+                    cardName.innerText = 'Flash Storage?';
+                    beastIcon.innerText = '📸';
+                    storyText.innerHTML = "Enter the correct phrase to change star level to find all the pieces of the flag. The complete flag will only be accepted at star level 8: the final form.";
+                    break;
+                case 5:
+                    cardName.innerText = 'Golden Archive Golem';
+                    beastIcon.innerText = '📀';
+                    storyText.innerHTML = "The remaining phrases are not written in the HTML. To proceed, consider how this application tracks your current state..<br><span style='font-size: 0.8rem; color:#555;'>*Hint: The first fragment of the true name is hidden down at star level 2.*</span>";
+                    break;
+                case 6:
+                    cardName.innerText = 'Magnetic Tape Worm';
+                    beastIcon.innerText = '📼';
+                    storyText.innerHTML = `The tape unwinds, dropping the second fragment:<br><br><span class='highlight'>[ ${FLAG_PARTS[1]} ]</span><br><br>The final piece lies at the lucky number.`;
+                    break;
+                case 7:
+                    cardName.innerText = 'Database Behemoth';
+                    beastIcon.innerText = '🗃';
+                    storyText.innerHTML = `The database unlocks its core table, the final fragment:<br><br><span class='highlight'>[ ${FLAG_PARTS[2]} ]</span><br><br>Now, reach the max level to bind it. Remember: Your mind must be clear of failure.`;
+                    break;
+                case 8:
+                    cardName.innerText = 'The Master Ledger';
+                    beastIcon.innerText = '📝';
+                    storyText.innerHTML = "The Gatekeeper watches. Enter the compiled True Name to capture the flag. <br><br><span style='font-size: 0.8rem; color:#666;'>*You cannot bind the data if your session is tainted by failure.*</span>";
+                    break;
+            }
+            
+            // Hide the hint box on any state transition.
+            // It will only be explicitly shown upon a failed tribute attempt.
+            hintBox.classList.remove('show');
+        }
+
+        function checkHints() {
+            let fails = parseInt(sessionStorage.getItem('failed_attempts'));
+            let currentLevel = parseInt(localStorage.getItem('star_level'));
+            
+            if (fails > 0) {
+                let hintHtml = "";
+                // Obfuscated: "<strong>System Error:</strong> Incorrect phrase. The Gatekeeper remembers your failure."
+                const errBase = atob('PHN0cm9uZz5TeXN0ZW0gRXJyb3I6PC9zdHJvbmc+IEluY29ycmVjdCBwaHJhc2UuIFRoZSBHYXRla2VlcGVyIHJlbWVtYmVycyB5b3VyIGZhaWx1cmUu');
+                
+                if (fails < 3) {
+                    hintHtml = errBase;
+                } else {
+                    if (currentLevel === 4) {
+                        // Level 4 Hints: DOM exploration
+                        if (fails < 5) hintHtml = atob('PHN0cm9uZz5IaW50IDE6PC9zdHJvbmc+IFRoZSBhcHBsaWNhdGlvbiBzdGF0ZSBkaWN0YXRlcyB0aGUgYmVhc3QncyBsZXZlbC4gSGF2ZSB5b3UgY2hlY2tlZCB5b3VyIGxvY2FsIGVudmlyb25tZW50IGRhdGE/');
+                        else if (fails < 7) hintHtml = atob('PHN0cm9uZz5IaW50IDI6PC9zdHJvbmc+IFByZXNzIEYxMiB0byBzZWUgdGhlIG1hcmt1cCBiZWhpbmQgdGhlIFVJLi4=');
+                        else hintHtml = atob('PHN0cm9uZz5IaW50IDM6PC9zdHJvbmc+IFRoZSBkZXYgbGVmdCBhbiBpbnRlcmVzdGluZyBjb21tZW50IGluIHRoZSBIVE1MLi4=');
+                    } else if (currentLevel === 8) {
+                        // Level 8 Hint: Session Storage
+                        hintHtml = atob('PHN0cm9uZz5IaW50Ojwvc3Ryb25nPiBZb3VyIGZhaWx1cmVzIGFyZSBsb2dnZWQgaW4gYSB0ZW1wb3Jhcnkgc3RhdGUuIFdoYXQgYnJvd3NlciBzdG9yYWdlIGNsZWFycyBpdHNlbGYgd2hlbiB0aGUgdGFiIGlzIGNsb3NlZD8=');
+                    } else {
+                        // Levels 1, 2, 3, 5, 6, 7 Hints: Local Storage manipulation
+                        if (fails < 5) hintHtml = atob('PHN0cm9uZz5IaW50IDE6PC9zdHJvbmc+IFRoZSBmcm9udCBkb29yIGlzIGxvY2tlZC4gSG93IGRvZXMgdGhlIGFwcGxpY2F0aW9uIHJlbWVtYmVyIHlvdXIgY3VycmVudCBsZXZlbD8gTG9vayBmb3IgdGhlIEFwcGxpY2F0aW9uIHRhYi4=');
+                        else hintHtml = atob('PHN0cm9uZz5IaW50IDI6PC9zdHJvbmc+IFRyeSBtb2RpZnlpbmcgdGhlICdzdGFyX2xldmVsJyBrZXkgZGlyZWN0bHkgd2l0aGluIExvY2FsIFN0b3JhZ2UsIHRoZW4gcmVmcmVzaC4=');
+                    }
+                }
+                
+                hintBox.innerHTML = `<div>${hintHtml}</div><div class="close-toast" onclick="document.getElementById('hint-box').classList.remove('show')">&times;</div>`;
+                setTimeout(() => hintBox.classList.add('show'), 10);
+            } else {
+                hintBox.classList.remove('show');
+            }
+        }
+
+        submitBtn.addEventListener('click', () => {
+            let currentLevel = parseInt(localStorage.getItem('star_level'));
+            let fails = parseInt(sessionStorage.getItem('failed_attempts'));
+            
+            if (currentLevel === 4 && passInput.value.toLowerCase() === 'shadow_step') {
+                localStorage.setItem('star_level', '5');
+                passInput.value = '';
+                renderState();
+                return;
+            }
+
+            if (currentLevel < 8) {
+                sessionStorage.setItem('failed_attempts', (fails + 1).toString());
+                passInput.value = '';
+                passInput.style.transform = 'translateX(5px)';
+                setTimeout(() => passInput.style.transform = 'none', 100);
+                renderState();
+                checkHints();
+            } 
+            else if (currentLevel === 8) {
+                if (passInput.value === FULL_NAME) {
+                    if (fails === 0) {
+                        let startTime = parseInt(localStorage.getItem('start_time')) || Date.now();
+                        let timeTaken = Math.floor((Date.now() - startTime) / 1000);
+                        let minutes = Math.floor(timeTaken / 60);
+                        let seconds = timeTaken % 60;
+                        let timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+                        cardName.innerText = 'System Overridden';
+                        storyText.innerHTML = `<span style='color: green; font-weight: bold;'>[ BINDING SUCCESSFUL ]</span><br><br>You controlled the state and purged your session history.<br><br>Time to breach: <span style='color: var(--millennium-gold)'>${timeStr}</span><br><br>Flag: <span class='highlight'>flag{l0c4l_5t4t3_m4n1pul4t10n}</span>`;
+                        beastIcon.innerText = '🏆';
+                        hintBox.classList.remove('show');
+                        
+                        passInput.value = '[ SYSTEM OVERRIDE SUCCESSFUL ]';
+                        passInput.disabled = true;
+                        passInput.style.textAlign = 'center';
+                        passInput.style.color = 'var(--millennium-gold)';
+                        passInput.style.borderColor = 'var(--millennium-gold)';
+                        
+                        submitBtn.innerText = 'Beast Bound';
+                        submitBtn.disabled = true;
+                        submitBtn.style.opacity = '0.5';
+                        submitBtn.style.cursor = 'not-allowed';
+                    } else {
+                        alert("The Gatekeeper rejects your True Name. Your session is tainted by " + fails + " failed attempts. Purge your session memory and try again.");
+                    }
+                } else {
+                    sessionStorage.setItem('failed_attempts', (fails + 1).toString());
+                    renderState();
+                    checkHints();
+                }
+            }
+        });
+
+        passInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitBtn.click();
+            }
+        });
+
+        renderState();
+        
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'star_level') renderState();
+        });
+    </script>
+</body>
+</html>
