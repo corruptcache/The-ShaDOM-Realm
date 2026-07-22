@@ -23,9 +23,9 @@ You do not need to download or install anything to play. The entire realm is hos
 [Enter The ShaDOM Realm Here](https://corruptcache.github.io/The-ShaDOM-Realm/)
 
 (Optional) If you wish to review the source code locally, this project is built using entirely Vanilla HTML, CSS, and JavaScript. There is no complex build step or backend required.
-
+```
 git clone https://github.com/corruptcache/The-ShaDOM-Realm.git
-
+```
 Open index.html in any modern web browser.
 
 ## 🃏 Current Challenges
